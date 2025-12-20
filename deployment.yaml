@@ -1,0 +1,198 @@
+# --- Persistent Volume Claim (Storage) ---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+# --- Postgres Service ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+spec:
+  ports:
+    - port: 5432
+  selector:
+    app: postgres
+---
+# --- Postgres Deployment ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+spec:
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:13
+          env:
+            - name: POSTGRES_PASSWORD
+              value: "password"
+            - name: POSTGRES_DB
+              value: "weatherdb"
+          volumeMounts:
+            - name: init-script
+              mountPath: /docker-entrypoint-initdb.d
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: init-script
+          configMap:
+            name: db-init
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+---
+# --- Database Schema Script ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-init
+data:
+  init.sql: |
+    CREATE TABLE IF NOT EXISTS weather_readings (
+        id BIGSERIAL PRIMARY KEY,
+        station_id BIGINT,
+        sequence_number BIGINT,
+        battery_status VARCHAR(10),
+        timestamp BIGINT,
+        humidity INT,
+        temperature INT,
+        wind_speed INT
+    );
+---
+# --- Zookeeper ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper-service
+spec:
+  ports:
+    - port: 2181
+  selector:
+    app: zookeeper
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zookeeper
+spec:
+  selector:
+    matchLabels:
+      app: zookeeper
+  template:
+    metadata:
+      labels:
+        app: zookeeper
+    spec:
+      containers:
+        - name: zookeeper
+          image: wurstmeister/zookeeper
+          ports:
+            - containerPort: 2181
+---
+# --- Kafka ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-service
+spec:
+  ports:
+    - port: 9092
+  selector:
+    app: kafka
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka
+spec:
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka
+    spec:
+      containers:
+        - name: kafka
+          image: wurstmeister/kafka
+          ports:
+            - containerPort: 9092
+          env:
+            - name: KAFKA_ADVERTISED_HOST_NAME
+              value: kafka-service
+            - name: KAFKA_ZOOKEEPER_CONNECT
+              value: zookeeper-service:2181
+            - name: KAFKA_CREATE_TOPICS
+              value: "weather-readings:1:1,heavy-rain-alerts:1:1"
+---
+# --- Central Station ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: central-station
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: central-station
+  template:
+    metadata:
+      labels:
+        app: central-station
+    spec:
+      containers:
+        - name: central-station
+          image: weather-system:v1
+          imagePullPolicy: Never
+          env:
+            - name: APP_CLASS
+              value: "com.soffar.CentralStation"
+            - name: KAFKA_SERVER
+              value: "kafka-service:9092"
+            - name: DB_URL
+              value: "jdbc:postgresql://postgres-service:5432/weatherdb"
+            - name: DB_USER
+              value: "postgres"
+            - name: DB_PASS
+              value: "password"
+---
+# --- Weather Station ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: weather-station
+spec:
+  replicas: 10
+  selector:
+    matchLabels:
+      app: weather-station
+  template:
+    metadata:
+      labels:
+        app: weather-station
+    spec:
+      containers:
+        - name: weather-station
+          image: weather-system:v1
+          imagePullPolicy: Never
+          env:
+            - name: APP_CLASS
+              value: "com.soffar.Weatherstation"
+            - name: KAFKA_SERVER
+              value: "kafka-service:9092"
