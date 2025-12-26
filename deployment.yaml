@@ -142,6 +142,7 @@ spec:
               value: "weather-readings:1:1,heavy-rain-alerts:1:1"
 ---
 # --- Central Station ---
+# --- Central Station ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -158,11 +159,10 @@ spec:
     spec:
       containers:
         - name: central-station
-          image: weather-system:v1
+          image: central-station:v1   # <--- UPDATED IMAGE NAME
           imagePullPolicy: Never
           env:
-            - name: APP_CLASS
-              value: "com.soffar.CentralStation"
+            # APP_CLASS removed (handled by Dockerfile.central)
             - name: KAFKA_SERVER
               value: "kafka-service:9092"
             - name: DB_URL
@@ -189,10 +189,9 @@ spec:
     spec:
       containers:
         - name: weather-station
-          image: weather-system:v1
+          image: weather-station:v1   # <--- UPDATED IMAGE NAME
           imagePullPolicy: Never
           env:
-            - name: APP_CLASS
-              value: "com.soffar.Weatherstation"
+            # APP_CLASS removed (handled by Dockerfile.weather)
             - name: KAFKA_SERVER
               value: "kafka-service:9092"

@@ -27,6 +27,7 @@ public class Weatherstation {
         System.out.println("Starting Station ID: " + STATION_ID + " connecting to " + BOOTSTRAP_SERVERS);
 
         while (true) {
+            sequenceNumber++;
             // 1. Simulate 10% Drop Rate (Network Packet Loss)
             if (random.nextDouble() < 0.10) {
                 System.out.println("Station " + STATION_ID + ": Message dropped (simulated loss).");
@@ -45,6 +46,9 @@ public class Weatherstation {
             ObjectNode root = mapper.createObjectNode();
             root.put("station_id", STATION_ID);
             root.put("s_no", ++sequenceNumber);
+
+
+
             root.put("battery_status", batteryStatus);
             root.put("status_timestamp", System.currentTimeMillis() / 1000);
 

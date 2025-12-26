@@ -62,7 +62,11 @@ public class CentralStation {
 
                     // RAIN CHECK
                     if (node.has("weather") && node.get("weather").get("humidity").asInt() > 70) {
-                        System.out.println("!!! RAIN ALERT !!! Station " + node.get("station_id"));
+
+
+
+                        int humidity = node.get("weather").get("humidity").asInt();
+                        System.out.println("!!! RAIN ALERT !!! Station " + node.get("station_id") + " | Humidity: " + humidity + "%");
                         alertProducer.send(new ProducerRecord<>(RAIN_TOPIC, "rain_alert", "Heavy rain at station " + node.get("station_id")));
                     }
                     buffer.add(node);
@@ -70,7 +74,7 @@ public class CentralStation {
             }
 
             // BATCH INSERT
-            if (buffer.size() >= 5000) {   // lw 5000 zy ma matloob 7nstna moda 4wea
+            if (buffer.size() >= 5000) {
                 for (JsonNode n : buffer) {
                     insertStmt.setLong(1, n.get("station_id").asLong());
                     insertStmt.setLong(2, n.get("s_no").asLong());
